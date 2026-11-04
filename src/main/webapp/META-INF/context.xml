@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- allowCasualMultipartParsing: CsrfFilter doc duoc token trong form upload (task 13).
+     SameSite=Lax: cookie phien khong gui kem POST tu trang web khac, them mot lop chong CSRF. -->
+<Context allowCasualMultipartParsing="true">
+    <CookieProcessor sameSiteCookies="lax"/>
+</Context>

@@ -1,0 +1,12 @@
+<%-- Phan trang dung chung. Trang goi dat bien "base" (URL danh sach) va request co "result" (Page) va "q". --%>
+<div class="pager">
+    <c:if test="${result.hasPrevious}">
+        <c:url var="prevUrl" value="${base}"><c:param name="page" value="${result.page - 1}"/><c:param name="q" value="${q}"/></c:url>
+        <a href="${prevUrl}">Trang trước</a>
+    </c:if>
+    <span class="muted">Trang ${result.page}, tổng ${result.total} dòng</span>
+    <c:if test="${result.hasNext}">
+        <c:url var="nextUrl" value="${base}"><c:param name="page" value="${result.page + 1}"/><c:param name="q" value="${q}"/></c:url>
+        <a href="${nextUrl}">Trang sau</a>
+    </c:if>
+</div>
