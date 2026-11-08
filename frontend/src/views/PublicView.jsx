@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PLANS_DATA, getDiscountPercent, INITIAL_ORDERS, INITIAL_CONNECTIONS, INITIAL_BILLS } from '../data/mockData.js';
+import HomeBanner from '../components/HomeBanner.jsx';
 import { Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send, Printer } from 'lucide-react';
 
 export default function PublicView() {
@@ -45,27 +46,8 @@ export default function PublicView() {
 
   return (
     <div>
-      {/* Hero Section */}
-      <section id="home-section" className="hero-banner">
-        <div className="hero-content">
-          <span className="hero-tag">
-            <Zap size={14} />
-            Hệ thống Dịch vụ Viễn thông Nexus
-          </span>
-          <h1 className="hero-title">Kết nối Siêu tốc, Ổn định & Dịch vụ Hoàn hảo</h1>
-          <p className="hero-desc">
-            Nexus Communication System mang đến giải pháp viễn thông toàn diện: Internet cáp quang băng rộng (Broadband), Dial-up bảo mật cao và Điện thoại cố định nội hạt - liên tỉnh cho mọi gia đình và tổ chức.
-          </p>
-          <div className="hero-actions">
-            <a href="#plans-section" className="btn btn-primary btn-lg" style={{ textDecoration: 'none' }}>
-              Khám Phá Gói Cước
-            </a>
-            <a href="#tracking-section" className="btn btn-secondary btn-lg" style={{ textDecoration: 'none' }}>
-              Tra Cứu Đơn & Cước Nhanh
-            </a>
-          </div>
-        </div>
-      </section>
+      {/* Home Banner Carousel */}
+      <HomeBanner />
 
       {/* KPI Highlights */}
       <div className="stats-grid">
