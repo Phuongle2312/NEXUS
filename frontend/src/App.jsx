@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import TopHeader from './components/TopHeader.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import PublicView from './views/PublicView.jsx';
@@ -69,6 +70,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <TopHeader />
       <Navbar activeSection={activeSection} onNavigate={handleNavigation} />
 
       <main className="app-container">
