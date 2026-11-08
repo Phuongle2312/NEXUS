@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { PLANS_DATA, getDiscountPercent, INITIAL_ORDERS, INITIAL_CONNECTIONS, INITIAL_BILLS } from '../data/mockData.js';
+import { PLANS_DATA, getDiscountPercent, INITIAL_ORDERS, INITIAL_CONNECTIONS, INITIAL_BILLS, SHOPS } from '../data/mockData.js';
 import HomeBanner from '../components/HomeBanner.jsx';
-import { Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send, Printer } from 'lucide-react';
+import { Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send, Printer, MapPin, HelpCircle, ChevronDown } from 'lucide-react';
 
 export default function PublicView() {
   const [activeTab, setActiveTab] = useState('BROADBAND');
@@ -16,6 +16,30 @@ export default function PublicView() {
   const [selectedBillModal, setSelectedBillModal] = useState(null);
 
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const toggleFaq = (idx) => {
+    setOpenFaq(openFaq === idx ? null : idx);
+  };
+
+  const faqs = [
+    {
+      q: 'Tại sao dịch vụ Internet Dial-up bắt buộc phải có đường dây điện thoại cố định Nexus?',
+      a: 'Theo quy chuẩn hạ tầng của Nexus, đường truyền Dial-up sử dụng băng tần thoại qua tổng đài Nexus nội hạt để truyền tải dữ liệu bảo mật cao. Do đó, khách hàng cần có sẵn đường truyền Landline của Nexus để kích hoạt kết nối Dial-up.'
+    },
+    {
+      q: 'Tiền đặt cọc bảo đảm (Security Deposit) là gì và khi nào được hoàn trả?',
+      a: 'Tiền đặt cọc là khoản bảo đảm thiết bị ($325 với Dial-up, $500 với Broadband, $250 với Landline). Khoản tiền này sẽ được hoàn lại 100% cho khách hàng khi thanh lý hợp đồng dịch vụ sau khi đã đối soát và khấu trừ hết nợ cước (nếu có).'
+    },
+    {
+      q: 'Chính sách chiết khấu số lượng lớn (Corporate Schemes) được tính như thế nào?',
+      a: 'Ưu đãi được áp dụng giảm trừ trực tiếp trên cả cước ứng trước và tiền cọc: 10–15 kết nối (giảm 25%), 16–25 kết nối (giảm 50%), 26–50 kết nối (giảm 75%) và trên 50 kết nối (giảm 100% - miễn phí cọc và cước trả trước).'
+    },
+    {
+      q: 'Làm thế nào để theo dõi tiến độ đơn hàng và xem hóa đơn cước hàng tháng?',
+      a: 'Bạn chỉ cần nhập mã Order ID (11 ký tự) tại khung tra cứu để xem tiến độ khảo sát và cấp mạng. Khi đã có kết nối, nhập mã Account ID (16 ký tự) để xem chi tiết tiền cước, nợ tồn và in biên lai hóa đơn trực tuyến.'
+    }
+  ];
 
   const filteredPlans = PLANS_DATA.filter(p => p.service === activeTab);
   const discountPct = getDiscountPercent(sliderQuantity);
