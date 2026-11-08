@@ -44,18 +44,18 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
         <div className="hero-content">
           <span className="hero-tag">
             <Zap size={14} />
-            Hệ thống Viễn thông Thế hệ Mới (React 19 & Vite)
+            Hệ thống Viễn thông Thế hệ Mới
           </span>
           <h1 className="hero-title">Kết nối Siêu tốc, Ổn định & Dịch vụ Hoàn hảo</h1>
           <p className="hero-desc">
             Nexus Communication System hân hạnh mang tới giải pháp viễn thông toàn diện: Internet cáp quang băng rộng (Broadband), Dial-up bảo mật cao và Điện thoại cố định nội hạt - liên tỉnh cho mọi gia đình và tổ chức.
           </p>
           <div className="hero-actions">
-            <a href="#plans-section" className="btn btn-primary btn-lg" style={{ textDecoration: 'none' }}>
+            <button className="btn btn-primary btn-lg" onClick={() => onRegisterClick()}>
+              Đăng Ký Trực Tuyến
+            </button>
+            <a href="#plans-section" className="btn btn-secondary btn-lg" style={{ textDecoration: 'none' }}>
               Khám Phá Gói Cước
-            </a>
-            <a href="#tracking-section" className="btn btn-secondary btn-lg" style={{ textDecoration: 'none' }}>
-              Tra Cứu Đơn & Tài Khoản
             </a>
           </div>
         </div>
