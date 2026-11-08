@@ -1,0 +1,19 @@
+<%-- Bang cac khoan tien cua hoa don, dung chung cho xem truoc va xem chi tiet. Trang goi dat bien "b". --%>
+<div class="table-wrap"><table>
+    <tr><th>Khoản</th><th class="num">Số tiền ($)</th></tr>
+    <tr><td>Phí gói</td><td class="num">${b.planFee}</td></tr>
+    <c:forEach var="line" items="${b.callLines}">
+        <tr><td>Cước ${line.callType}: ${line.minutes} phút × ${line.ratePerMin}</td><td class="num">${line.amount}</td></tr>
+    </c:forEach>
+    <tr><td>Vượt gói (dùng ${b.usageHours} giờ trong kỳ)</td><td class="num">${b.overageCharges}</td></tr>
+    <tr><td>Phí thay thiết bị</td><td class="num">${b.replacementCharges}</td></tr>
+    <tr><td>Điều chỉnh</td><td class="num">${b.adjustment}</td></tr>
+    <tr><td>Phần chịu thuế</td><td class="num">${b.taxableBase}</td></tr>
+    <tr><td>Thuế dịch vụ ${b.taxPercent.toPlainString()}%</td><td class="num">${b.taxAmount}</td></tr>
+    <tr><td>Đặt cọc (không chịu thuế)</td><td class="num">${b.depositAmount}</td></tr>
+    <tr class="total-row"><td>Tổng kỳ này</td><td class="num">${b.totalAmount}</td></tr>
+    <tr><td>Đã trả</td><td class="num">${b.paidAmount}</td></tr>
+    <tr class="total-row"><td>Còn nợ kỳ này</td><td class="num">${b.dueAmount}</td></tr>
+    <tr><td>Nợ các kỳ trước (chỉ hiển thị)</td><td class="num">${b.previousDue}</td></tr>
+    <tr class="total-row"><td>Cần thanh toán</td><td class="num">${b.amountToPay}</td></tr>
+</table></div>
