@@ -222,3 +222,4 @@ export default function TechnicalView({ orders, connections, onUpdateOrderStatus
     </div>
   );
 }
+

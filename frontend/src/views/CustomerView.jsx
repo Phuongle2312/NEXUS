@@ -170,3 +170,4 @@ export default function CustomerView({ connections, bills }) {
     </div>
   );
 }
+

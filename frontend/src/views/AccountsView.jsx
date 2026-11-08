@@ -350,3 +350,4 @@ export default function AccountsView({ bills, connections, onAddBill, onCollectP
     </div>
   );
 }
+

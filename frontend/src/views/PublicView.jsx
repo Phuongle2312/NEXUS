@@ -393,3 +393,4 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
     </div>
   );
 }
+

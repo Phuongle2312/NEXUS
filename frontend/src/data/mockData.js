@@ -202,3 +202,4 @@ export const EMPLOYEES = [
   { id: 4, username: 'accounts', fullName: 'Phạm Thị Mai', role: 'ACCOUNTS', shopName: 'Ban Tài chính Kế toán', email: 'mai.pham@nexus.com' },
   { id: 5, username: 'customer1', fullName: 'Đặng Tuấn Anh (Alpha Corp)', role: 'CUSTOMER', shopName: 'Online', email: 'alpha.corp@gmail.com' }
 ];
+

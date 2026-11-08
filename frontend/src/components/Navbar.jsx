@@ -107,3 +107,4 @@ export default function Navbar({ currentRole, onRoleChange }) {
     </header>
   );
 }
+
