@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # Microsoft SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: nexus-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrongPassword!2026
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql
+      - ./database:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+
+  # Backend Java / Tomcat Server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: nexus-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - DB_HOST=sqlserver
+      - DB_PORT=1433
+      - DB_NAME=nexus
+      - DB_USER=sa
+      - DB_PASSWORD=YourStrongPassword!2026
+    depends_on:
+      - sqlserver
+    restart: unless-stopped
+
+  # Frontend Web Client
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexus-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mssql-data:
+
