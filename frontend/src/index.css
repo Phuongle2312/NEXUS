@@ -87,7 +87,15 @@ body {
   background-color: var(--secondary);
   color: #94a3b8;
   font-size: 0.825rem;
-  padding: 6px 1.5rem;
+  padding: 6px 0;
+  width: 100%;
+}
+
+.top-notice-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -126,57 +134,36 @@ body {
 .main-navbar {
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
-  padding: 0.85rem 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   position: sticky;
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow-sm);
+  width: 100%;
+}
+
+.navbar-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0.65rem 1.5rem;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .brand-wrapper {
   display: flex;
   align-items: center;
-  gap: 12px;
   text-decoration: none;
   color: inherit;
   cursor: pointer;
 }
 
-.brand-icon {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 800;
-  font-size: 1.25rem;
-  box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);
-}
-
-.brand-title {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--secondary);
-  letter-spacing: -0.5px;
-}
-
-.brand-title span {
-  color: var(--primary);
-}
-
-.brand-subtitle {
-  font-size: 0.725rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
+.brand-logo-img {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
   display: block;
-  font-weight: 600;
 }
 
 .nav-links {
