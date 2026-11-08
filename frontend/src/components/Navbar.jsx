@@ -1,10 +1,19 @@
 import React from 'react';
-import { Phone, User, Search, FileText, Send, Sparkles } from 'lucide-react';
+import { Phone, Search, Home, Layers, Tag, MessageSquareText } from 'lucide-react';
 
-export default function Navbar({ activeSection, onNavigate }) {
+export default function Navbar({ activeSection = 'home', onNavigate }) {
+  const navItems = [
+    { id: 'home', label: 'Trang Chủ', icon: Home },
+    { id: 'plans', label: 'Gói Cước & Dịch Vụ', icon: Layers },
+    { id: 'schemes', label: 'Ưu Đãi Số Lượng Lớn', icon: Tag },
+    { id: 'tracking', label: 'Tra Cứu Đơn & Cước', icon: Search },
+    { id: 'feedback', label: 'Góp Ý & Phản Hồi', icon: MessageSquareText }
+  ];
+
   return (
     <header className="main-navbar">
       <div className="navbar-container">
+        {/* Brand Logo */}
         <div className="brand-wrapper" onClick={() => onNavigate('home')} style={{ cursor: 'pointer' }}>
           <img
             src="https://coderent.vn/storage/settings/YfEwVsPubmDolpSAhDLDc5DKuDdRCZZccY3M9yfO.png"
@@ -13,65 +22,41 @@ export default function Navbar({ activeSection, onNavigate }) {
           />
         </div>
 
-        <nav>
+        {/* Navigation Items */}
+        <nav className="nav-center-menu">
           <ul className="nav-links">
-            <li>
-              <button
-                className={`nav-link-btn ${activeSection === 'home' ? 'active' : ''}`}
-                onClick={() => onNavigate('home')}
-              >
-                Trang Chủ
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-link-btn ${activeSection === 'plans' ? 'active' : ''}`}
-                onClick={() => onNavigate('plans')}
-              >
-                Gói Cước & Dịch Vụ
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-link-btn ${activeSection === 'register' ? 'active' : ''}`}
-                onClick={() => onNavigate('register')}
-              >
-                <Sparkles size={15} color="var(--primary)" />
-                Đăng Ký Dịch Vụ
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-link-btn ${activeSection === 'tracking' ? 'active' : ''}`}
-                onClick={() => onNavigate('tracking')}
-              >
-                <Search size={15} />
-                Tra Cứu Đơn & Cước
-              </button>
-            </li>
-            <li>
-              <button
-                className={`nav-link-btn ${activeSection === 'feedback' ? 'active' : ''}`}
-                onClick={() => onNavigate('feedback')}
-              >
-                <Send size={15} />
-                Góp Ý & Khiếu Nại
-              </button>
-            </li>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={`nav-link-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => onNavigate(item.id)}
+                  >
+                    <Icon size={16} className="nav-item-icon" />
+                    <span>{item.label}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
+        {/* Actions */}
         <div className="header-actions">
           <a href="tel:19008888" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
             <Phone size={15} />
-            1900 8888
+            <span className="hotline-text">1900 8888</span>
           </a>
           <button
-            className={`btn ${activeSection === 'portal' ? 'btn-primary' : 'btn-outline'} btn-sm`}
-            onClick={() => onNavigate('portal')}
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => onNavigate('tracking')}
           >
-            <User size={15} />
-            Cổng Khách Hàng
+            <Search size={15} />
+            <span>Tra Cứu Nhanh</span>
           </button>
         </div>
       </div>

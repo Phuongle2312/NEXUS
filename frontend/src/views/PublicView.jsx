@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { PLANS_DATA, getDiscountPercent } from '../data/mockData.js';
-import { Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send } from 'lucide-react';
+import { PLANS_DATA, getDiscountPercent, INITIAL_ORDERS, INITIAL_CONNECTIONS, INITIAL_BILLS } from '../data/mockData.js';
+import { Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send, Printer } from 'lucide-react';
 
-export default function PublicView({ orders, connections, onRegisterClick }) {
+export default function PublicView() {
   const [activeTab, setActiveTab] = useState('BROADBAND');
   const [sliderQuantity, setSliderQuantity] = useState(12);
 
@@ -12,6 +12,7 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
 
   const [searchAccountId, setSearchAccountId] = useState('B001000000000001');
   const [accountResult, setAccountResult] = useState(null);
+  const [selectedBillModal, setSelectedBillModal] = useState(null);
 
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
@@ -20,14 +21,19 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
 
   const handleSearchOrder = () => {
     const q = searchOrderId.trim().toUpperCase();
-    const found = orders.find(o => o.orderId.toUpperCase() === q);
+    const found = INITIAL_ORDERS.find(o => o.orderId.toUpperCase() === q);
     setOrderResult(found || { notFound: true, query: q });
   };
 
   const handleSearchAccount = () => {
     const q = searchAccountId.trim().toUpperCase();
-    const found = connections.find(c => c.accountId.toUpperCase() === q);
-    setAccountResult(found || { notFound: true, query: q });
+    const conn = INITIAL_CONNECTIONS.find(c => c.accountId.toUpperCase() === q);
+    if (!conn) {
+      setAccountResult({ notFound: true, query: q });
+      return;
+    }
+    const bill = INITIAL_BILLS.find(b => b.accountId.toUpperCase() === q);
+    setAccountResult({ conn, bill });
   };
 
   const handleFeedbackSubmit = (e) => {
@@ -40,22 +46,22 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
   return (
     <div>
       {/* Hero Section */}
-      <section className="hero-banner">
+      <section id="home-section" className="hero-banner">
         <div className="hero-content">
           <span className="hero-tag">
             <Zap size={14} />
-            Hệ thống Viễn thông Thế hệ Mới
+            Hệ thống Dịch vụ Viễn thông Nexus
           </span>
           <h1 className="hero-title">Kết nối Siêu tốc, Ổn định & Dịch vụ Hoàn hảo</h1>
           <p className="hero-desc">
-            Nexus Communication System hân hạnh mang tới giải pháp viễn thông toàn diện: Internet cáp quang băng rộng (Broadband), Dial-up bảo mật cao và Điện thoại cố định nội hạt - liên tỉnh cho mọi gia đình và tổ chức.
+            Nexus Communication System mang đến giải pháp viễn thông toàn diện: Internet cáp quang băng rộng (Broadband), Dial-up bảo mật cao và Điện thoại cố định nội hạt - liên tỉnh cho mọi gia đình và tổ chức.
           </p>
           <div className="hero-actions">
-            <button className="btn btn-primary btn-lg" onClick={() => onRegisterClick()}>
-              Đăng Ký Trực Tuyến
-            </button>
-            <a href="#plans-section" className="btn btn-secondary btn-lg" style={{ textDecoration: 'none' }}>
+            <a href="#plans-section" className="btn btn-primary btn-lg" style={{ textDecoration: 'none' }}>
               Khám Phá Gói Cước
+            </a>
+            <a href="#tracking-section" className="btn btn-secondary btn-lg" style={{ textDecoration: 'none' }}>
+              Tra Cứu Đơn & Cước Nhanh
             </a>
           </div>
         </div>
@@ -99,7 +105,7 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
           <div className="nexus-card-header">
             <div>
               <h2 className="nexus-card-title">Bảng Giá Dịch Vụ & Gói Cước Niêm Yết</h2>
-              <p className="form-hint">Mọi gói cước được áp dụng theo đúng quy chuẩn ban hành của Nexus</p>
+              <p className="form-hint">Mọi gói cước được áp dụng theo đúng quy chuẩn ban hành của Nexus Telecom</p>
             </div>
           </div>
 
@@ -159,25 +165,22 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
                     </li>
                   )}
                 </ul>
-                <button
-                  className={`btn ${plan.featured ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => onRegisterClick(plan)}
-                >
-                  Đăng Ký Tại Cửa Hàng
-                </button>
+                <a href="#schemes-section" className={`btn ${plan.featured ? 'btn-primary' : 'btn-outline'}`} style={{ textDecoration: 'none' }}>
+                  Tính Chiết Khấu Khi Đăng Ký
+                </a>
               </div>
             ))}
           </div>
 
           {/* Bulk Discount Interactive Calculator */}
-          <div className="bulk-calculator-card">
+          <div id="schemes-section" className="bulk-calculator-card">
             <div className="flex-between">
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#166534', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   🏷️ Công Cụ Tính Chiết Khấu Số Lượng Lớn (Corporate Schemes)
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: '#15803d' }}>
-                  Giảm trừ trực tiếp trên phí ứng trước (Advance Plan Fee) và tiền đặt cọc (Security Deposit)
+                  Ưu đãi áp dụng khi khách hàng hoặc doanh nghiệp đăng ký từ 10 đường truyền trở lên
                 </p>
               </div>
               <div className="discount-tier-badge">
@@ -188,10 +191,10 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
             <div className="slider-container" style={{ margin: '1.5rem 0' }}>
               <div className="flex-between" style={{ marginBottom: '8px', fontWeight: 700 }}>
                 <span>
-                  Số lượng kết nối đăng ký cùng lúc:{' '}
+                  Số lượng kết nối dự kiến đăng ký:{' '}
                   <strong style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>{sliderQuantity}</strong> kết nối
                 </span>
-                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Từ 1 đến 60+ kết nối</span>
+                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Kéo thanh trượt từ 1 đến 60+ kết nối</span>
               </div>
               <input
                 type="range"
@@ -235,15 +238,15 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
         </div>
       </section>
 
-      {/* Tracking Section */}
+      {/* Tracking Section (Order & Account ID) */}
       <section id="tracking-section" className="mt-4">
         <div className="grid-2">
           {/* Order Tracking */}
           <div className="nexus-card">
             <div className="nexus-card-header">
-              <h3 className="nexus-card-title">📦 Tra Cứu Đơn Hàng (Order ID)</h3>
+              <h3 className="nexus-card-title">📦 Tra Cứu Tiến Độ Đơn (Order ID)</h3>
             </div>
-            <p className="form-hint">Nhập mã đơn hàng 11 ký tự (VD: <code>B0000000001</code>, <code>D0000000002</code>)</p>
+            <p className="form-hint">Nhập mã đơn hàng 11 ký tự bạn nhận được tại cửa hàng (VD: <code>B0000000001</code>)</p>
             <div className="flex-gap-2" style={{ marginTop: '1rem' }}>
               <input
                 type="text"
@@ -288,15 +291,15 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
                       <div className="step-label">Cấp Đấu Nối</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.6 }}>
                     • Gói đăng ký: <strong>{orderResult.planName}</strong> ({orderResult.quantity} đường)<br />
                     • Đặt cọc: <strong>${orderResult.totalDeposit.toLocaleString()}</strong> | Cước ứng trước: <strong>${orderResult.totalAdvance.toLocaleString()}</strong> (Đã giảm {orderResult.discountPercent}%)<br />
-                    • Cửa hàng tiếp nhận: <strong>{orderResult.shop}</strong> ({orderResult.createdAt})
+                    • Điểm tiếp nhận: <strong>{orderResult.shop}</strong> ({orderResult.createdAt})
                   </div>
                 </div>
               ) : (
                 <div className="text-muted" style={{ fontSize: '0.875rem' }}>
-                  Nhấn "Tra Cứu" để xem tiến độ khảo sát và lắp đặt của đơn hàng.
+                  Nhấn "Tra Cứu" để theo dõi quy trình khảo sát đường truyền và thời gian lắp đặt.
                 </div>
               )}
             </div>
@@ -305,7 +308,7 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
           {/* Account Tracking */}
           <div className="nexus-card">
             <div className="nexus-card-header">
-              <h3 className="nexus-card-title">📡 Tra Cứu Tài Khoản (Account ID)</h3>
+              <h3 className="nexus-card-title">📡 Tra Cứu Cước & Thuê Bao (Account ID)</h3>
             </div>
             <p className="form-hint">Nhập mã tài khoản 16 ký tự do Kỹ thuật cấp (VD: <code>B001000000000001</code>)</p>
             <div className="flex-gap-2" style={{ marginTop: '1rem' }}>
@@ -330,23 +333,39 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
                 <div>
                   <div className="flex-between">
                     <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
-                      Account ID: <code className="font-mono" style={{ color: 'var(--primary)' }}>{accountResult.accountId}</code>
+                      Account ID: <code className="font-mono" style={{ color: 'var(--primary)' }}>{accountResult.conn.accountId}</code>
                     </div>
-                    <span className={`badge ${accountResult.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
-                      {accountResult.status}
+                    <span className={`badge ${accountResult.conn.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
+                      {accountResult.conn.status}
                     </span>
                   </div>
                   <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '10px', lineHeight: 1.6 }}>
-                    • Chủ thuê bao: <strong>{accountResult.customerName}</strong><br />
-                    • Dịch vụ: <strong>{accountResult.service}</strong> ({accountResult.planName})<br />
-                    • Thiết bị modem/router: <code>{accountResult.equipmentSerial}</code><br />
-                    • Địa chỉ đấu nối: <strong>{accountResult.installationAddress}</strong><br />
-                    • Ngày kích hoạt: <strong>{accountResult.activatedAt}</strong>
+                    • Chủ thuê bao: <strong>{accountResult.conn.customerName}</strong><br />
+                    • Gói cước: <strong>{accountResult.conn.planName}</strong> ({accountResult.conn.service})<br />
+                    • Thiết bị modem/router: <code>{accountResult.conn.equipmentSerial}</code><br />
+                    • Địa chỉ: <strong>{accountResult.conn.installationAddress}</strong>
                   </div>
+
+                  {accountResult.bill && (
+                    <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span className="text-muted" style={{ fontSize: '0.8rem' }}>Cước kỳ gần nhất:</span>
+                        <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.1rem' }}>
+                          ${accountResult.bill.totalThisCycle.toFixed(2)}{' '}
+                          <span className={`badge ${accountResult.bill.status === 'PAID' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
+                            {accountResult.bill.status}
+                          </span>
+                        </div>
+                      </div>
+                      <button className="btn btn-outline btn-sm" onClick={() => setSelectedBillModal(accountResult.bill)}>
+                        <Printer size={14} /> Xem Hóa Đơn Chi Tiết
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-muted" style={{ fontSize: '0.875rem' }}>
-                  Nhấn "Tra Cứu" để xem tình trạng hoạt động và thiết bị của đường truyền.
+                  Nhập mã Account ID để xem cước phát sinh, số tiền nợ và tải hóa đơn trực tiếp.
                 </div>
               )}
             </div>
@@ -355,10 +374,10 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
       </section>
 
       {/* Feedback Section */}
-      <section className="mt-4">
+      <section id="feedback-section" className="mt-4">
         <div className="nexus-card">
           <div className="nexus-card-header">
-            <h3 className="nexus-card-title">💬 Gửi Ý Kiến Phản Hồi & Đóng Góp</h3>
+            <h3 className="nexus-card-title">💬 Gửi Ý Kiến Đóng Góp & Phản Hồi Dịch Vụ</h3>
           </div>
           {feedbackSuccess && (
             <div style={{ padding: '12px', background: 'var(--success-bg)', color: 'var(--success)', borderRadius: 'var(--radius)', marginBottom: '1rem', fontWeight: 600 }}>
@@ -390,7 +409,73 @@ export default function PublicView({ orders, connections, onRegisterClick }) {
           </form>
         </div>
       </section>
+
+      {/* Bill View Modal */}
+      {selectedBillModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>📄 Hóa Đơn Dịch Vụ Viễn Thông</h3>
+              <button className="btn btn-outline btn-sm" onClick={() => setSelectedBillModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ background: 'white', border: '1px dashed #cbd5e1', borderRadius: 'var(--radius)', padding: '2rem' }}>
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px dashed #cbd5e1', paddingBottom: '1rem' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>NEXUS COMMUNICATION SYSTEM</h2>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>DỊCH VỤ VIỄN THÔNG & INTERNET</div>
+                  <div style={{ marginTop: '8px', fontWeight: 700 }}>HÓA ĐƠN SỐ: {selectedBillModal.billId}</div>
+                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>Ngày phát hành: {selectedBillModal.issuedDate}</div>
+                </div>
+
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span className="text-muted">Chủ thuê bao:</span>
+                  <strong>{selectedBillModal.customerName}</strong>
+                </div>
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span className="text-muted">Account ID:</span>
+                  <code className="font-mono">{selectedBillModal.accountId}</code>
+                </div>
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span className="text-muted">Kỳ thanh toán:</span>
+                  <span>{selectedBillModal.billingCycle}</span>
+                </div>
+                <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '10px 0' }} />
+
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span>Cước gói thuê bao:</span>
+                  <span>${selectedBillModal.planFee.toFixed(2)}</span>
+                </div>
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span>Cước phát sinh / cuộc gọi:</span>
+                  <span>${selectedBillModal.usageOverdue.toFixed(2)}</span>
+                </div>
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                  <span>Thuế dịch vụ viễn thông (12.24%):</span>
+                  <span>${selectedBillModal.taxAmount.toFixed(2)}</span>
+                </div>
+
+                <div className="flex-between" style={{ borderTop: '2px solid var(--text-primary)', marginTop: '1rem', paddingTop: '0.75rem', fontWeight: 800, fontSize: '1.1rem' }}>
+                  <span>TỔNG HÓA ĐƠN:</span>
+                  <span style={{ color: 'var(--primary)' }}>${selectedBillModal.totalThisCycle.toFixed(2)}</span>
+                </div>
+
+                <div className="flex-between" style={{ marginTop: '8px', fontSize: '0.9rem' }}>
+                  <span className="text-muted">Tình trạng thanh toán:</span>
+                  <span className={`badge ${selectedBillModal.status === 'PAID' ? 'badge-success' : 'badge-danger'}`}>
+                    {selectedBillModal.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setSelectedBillModal(null)}>Đóng</button>
+              <button className="btn btn-primary" onClick={() => window.print()}>
+                <Printer size={16} /> In Hóa Đơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

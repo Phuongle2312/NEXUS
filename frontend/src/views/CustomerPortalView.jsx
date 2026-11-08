@@ -355,3 +355,4 @@ export default function CustomerPortalView({ connections, bills, orders }) {
     </div>
   );
 }
+
