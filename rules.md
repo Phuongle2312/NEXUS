@@ -2,15 +2,15 @@
 
 ## 1. Nguyên tắc giao diện chung (UI Guidelines)
 - **Chế độ màu chủ đạo**: **Light Mode (Nền sáng)** chuyên nghiệp, thanh lịch, phong cách viễn thông hiện đại.
-- **Border Radius**: Sử dụng biến root chuẩn **`8px`** cho toàn bộ hệ thống (nút bấm, ô nhập liệu, thẻ card, bảng biểu, modal, popup).
+- **Border Radius**: Sử dụng biến root chuẩn **`4px`** cho toàn bộ hệ thống (nút bấm, ô nhập liệu, thẻ card, bảng biểu, modal, popup).
   ```css
   :root {
-    --radius-root: 8px;
-    --radius-sm: 4px;
-    --radius: 8px;
-    --radius-md: 8px;
-    --radius-lg: 8px;
-    --radius-xl: 12px;
+    --radius-root: 4px;
+    --radius-sm: 2px;
+    --radius: 4px;
+    --radius-md: 4px;
+    --radius-lg: 4px;
+    --radius-xl: 4px;
   }
   ```
 

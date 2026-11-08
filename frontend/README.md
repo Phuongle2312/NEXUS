@@ -5,7 +5,7 @@
 ## 1. Tiêu chuẩn thiết kế (UI Standards)
 - **Công nghệ**: React 19 + JavaScript (ES6+, JSX) + Vite + Lucide Icons.
 - **Chế độ màu**: **Nền sáng (Light Mode)** với bảng màu viễn thông hiện đại (Sky Blue `#0284c7`, Slate `#0f172a`, border `#e2e8f0`).
-- **Border Radius**: Sử dụng biến root chuẩn **`8px`** (`:root { --radius: 8px; }`) đồng nhất cho mọi nút bấm, ô nhập liệu, thẻ card, bảng biểu, modal và badge.
+- **Border Radius**: Sử dụng biến root chuẩn **`4px`** (`:root { --radius: 4px; }`) đồng nhất cho mọi nút bấm, ô nhập liệu, thẻ card, bảng biểu, modal và badge.
 
 ## 2. Cấu trúc thư mục
 ```

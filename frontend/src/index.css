@@ -1,16 +1,16 @@
 /* ==========================================================================
    NEXUS REACT - MAIN STYLESHEET
-   UI Rules: Light mode (Nền sáng), Root Border Radius = 8px
+   UI Rules: Light mode (Nền sáng), Root Border Radius = 4px
    ========================================================================== */
 
 :root {
-  /* ROOT BORDER RADIUS QUY CHUẨN: 8PX */
-  --radius-root: 8px;
-  --radius-sm: 4px;
-  --radius: 8px;
-  --radius-md: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /* ROOT BORDER RADIUS QUY CHUẨN: 4PX */
+  --radius-root: 4px;
+  --radius-sm: 2px;
+  --radius: 4px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
   --radius-full: 9999px;
 
   /* LIGHT THEME COLOR PALETTE */
@@ -189,7 +189,7 @@ body {
 .nav-link-btn {
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius); /* Bo góc root 8px */
+  border-radius: var(--radius); /* Bo góc root 4px */
   padding: 8px 16px;
   color: #334155;
   font-weight: 600;
@@ -265,7 +265,7 @@ body {
 }
 
 /* ==========================================================================
-   HOME BANNER CAROUSEL SYSTEM (Light Mode, 8px Radius)
+   HOME BANNER CAROUSEL SYSTEM (Light Mode, 4px Radius)
    ========================================================================== */
 .home-banner-wrapper {
   position: relative;
@@ -276,7 +276,7 @@ body {
 .home-banner-card {
   background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 55%, #f8fafc 100%);
   border: 1px solid #bae6fd;
-  border-radius: var(--radius); /* Bo góc 8px */
+  border-radius: var(--radius); /* Bo góc 4px */
   padding: 2.75rem 2.5rem;
   display: grid;
   grid-template-columns: 1.35fr 0.95fr;
