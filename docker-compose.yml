@@ -1,39 +1,76 @@
-version: '3.8'
-
+# =============================================================================
+# NEXUS Service Marketing System - môi trường chạy bằng Docker
+#
+# Kiến trúc monolith:
+#   frontend (React/Vite + Nginx)  ──HTTP──▶  backend (ASP.NET Core Web API .NET 10)
+#                                                    │
+#                                                    ▼
+#                                          sqlserver (SQL Server 2022)
+# Không còn API gateway và không dùng microservice.
+# =============================================================================
 services:
-  # Microsoft SQL Server Database
+  # ------------------------------ Cơ sở dữ liệu ------------------------------
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: nexus-sqlserver
     environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=YourStrongPassword!2026
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrongPassword!2026"
+      MSSQL_PID: "Developer"
     ports:
       - "1433:1433"
     volumes:
       - mssql-data:/var/opt/mssql
-      - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
-  # Backend Java / Tomcat Server
+  # Tạo schema + dữ liệu mẫu một lần, sau khi SQL Server sẵn sàng.
+  # Dùng image sqlcmd riêng vì image mssql/server không tự chạy script trong initdb.d.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: nexus-db-init
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./database:/scripts:ro
+    entrypoint: >
+      /bin/bash -c "
+      /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'YourStrongPassword!2026' -C
+      -Q \"IF DB_ID('NEXUS') IS NULL CREATE DATABASE NEXUS\" &&
+      /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'YourStrongPassword!2026' -C -d NEXUS -i /scripts/schema.sql &&
+      /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'YourStrongPassword!2026' -C -d NEXUS -i /scripts/seed.sql
+      "
+    restart: "no"
+
+  # --------------------------- Backend .NET 10 ------------------------------
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend
+      dockerfile: backend/Dockerfile
     container_name: nexus-backend
     ports:
-      - "8081:8081"
+      - "5080:8080"
     environment:
-      - DB_HOST=sqlserver
-      - DB_PORT=1433
-      - DB_NAME=nexus
-      - DB_USER=sa
-      - DB_PASSWORD=YourStrongPassword!2026
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Nexus: "Server=sqlserver,1433;Database=NEXUS;User Id=sa;Password=YourStrongPassword!2026;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      # Khoá JWT tối thiểu 32 ký tự. Đổi giá trị này khi triển khai thật.
+      Jwt__Key: "NexusDockerSigningKey-ChangeMe-2026-AtLeast32Chars"
+      Cors__AllowedOrigins__0: "http://localhost:3000"
     depends_on:
-      - sqlserver
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
-  # Frontend Web Client
+  # ------------------------------ Web client --------------------------------
   frontend:
     build:
       context: ./frontend
@@ -47,4 +84,3 @@ services:
 
 volumes:
   mssql-data:
-

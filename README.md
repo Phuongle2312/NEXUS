@@ -8,7 +8,8 @@ eProject (Aptech): ứng dụng web quản lý dịch vụ viễn thông và Int
 |---|---|
 | Batch / Group | _(điền)_ |
 | Thành viên | Lê Trí Phương (trưởng nhóm), Lữ Văn Giỏi, Nguyễn Trần Xuân Cường |
-| Công nghệ | Java 17, **JSP/Servlets + JDBC**, CSDL **SQL Server 2019+**, máy chủ Tomcat 10.1 (thiết kế URL/API: `API_Design_NEXUS.md`) |
+| Công nghệ | **.NET 10** — ASP.NET Core Web API + EF Core, **React 19 + Vite 6**, CSDL **SQL Server 2019+** (thiết kế URL/API: `API_Design_NEXUS.md`) |
+| Kiến trúc | **Monolith** một tiến trình API, không API gateway, không microservice |
 | Ngày bắt đầu / kết thúc | 30/Oct/2026 / 28/Nov/2026 _(nhóm chốt 30 ngày, chờ mentor xác nhận)_ |
 
 ---
@@ -99,37 +100,51 @@ Nợ kỳ trước    = chỉ hiển thị, không cộng vào tổng kỳ này
 
 Chi tiết và giả định tạm thời: xem SRS, phần 10. Nội dung email: `DOUBT_Email_NEXUS.md`.
 
-## 5. Kiến trúc gợi ý
+## 5. Kiến trúc
 
 ```
-presentation (HTML/JSP, JS)
-      │
-servlet + filter  ── xác thực + phân quyền theo vai trò
-      │
-service (nghiệp vụ: sinh ID, khả thi, tính cước, ưu đãi, thuế)
-      │
-data access (JDBC, truy vấn tham số hóa)
-      │
-database (SQL Server)
+web client (React 19 + Vite)          web admin (React, cùng SPA)
+            │  fetch + JWT Bearer
+            ▼
+ASP.NET Core Web API (.NET 10) ── monolith, một tiến trình
+   controllers  ── xác thực JWT + phân quyền theo vai trò
+   services     ── nghiệp vụ: sinh ID, khả thi, tính cước, ưu đãi, thuế
+   EF Core      ── truy vấn tham số hóa, transaction
+            │
+            ▼
+   database (SQL Server)
 ```
 
-### Cấu trúc thư mục đề xuất
+Bản Java/JSP/Servlet cũ vẫn được giữ trong repo để tham chiếu, nhưng bản chạy chính thức là .NET 10.
+Không có API gateway và không chia microservice.
+
+### Cấu trúc thư mục
 
 ```
 nexus/
-├─ pom.xml              # cấu hình Maven
-├─ src/main/java/com/nexus/   # mã nguồn Java (xem API_Design_NEXUS.md, mục 5)
-├─ src/main/webapp/     # JSP, CSS, JS
+├─ backend/
+│  ├─ Nexus.slnx            # solution .NET 10
+│  ├─ Dockerfile            # multi-stage build cho API
+│  ├─ src/Nexus.Api/        # Program.cs, Common, Domain, Data, Services, Controllers
+│  └─ tests/Nexus.Tests/    # xUnit: công thức cước, quy tắc nghiệp vụ
+├─ frontend/
+│  ├─ Dockerfile            # build Vite rồi phục vụ bằng Nginx
+│  ├─ nginx.conf            # SPA fallback + proxy /api → backend
+│  └─ src/
+│     ├─ api/apiClient.js   # lớp gọi API .NET (JWT trong localStorage)
+│     ├─ views/             # PublicView (web client)
+│     └─ components/        # TopHeader, Navbar, HomeBanner, Footer
 ├─ database/
-│  ├─ schema.sql        # tạo bảng, khóa, ràng buộc
-│  ├─ seed.sql          # dữ liệu mẫu và tài khoản demo
-│  └─ backup/           # bản sao lưu DB để nộp
-├─ docs/                # tài liệu dự án (mục 7)
-├─ status/              # báo cáo tiến độ 1 và 2 (kèm ảnh chụp)
+│  ├─ schema.sql            # 25 bảng, khoá, ràng buộc
+│  └─ seed.sql              # dữ liệu mẫu và tài khoản demo
+├─ docs/                    # tài liệu dự án
+├─ status/                  # báo cáo tiến độ 1 và 2
+├─ docker-compose.yml       # sqlserver + db-init + backend + frontend
 └─ README.md
 ```
 
-Cách chạy trên máy và cách thêm module: `docs/Huong_dan_code_B_C.md`.
+Chạy backend: `backend/README.md`. Chạy toàn hệ thống: `docker compose up --build`.
+Hướng dẫn code chi tiết: `docs/Huong_dan_code_B_C.md`.
 
 ## 6. Quy ước phát triển
 
@@ -182,8 +197,11 @@ Cách chạy trên máy và cách thêm module: `docs/Huong_dan_code_B_C.md`.
 | SRS, thiết kế API | Bản 1.1, chờ mentor xác nhận giả định |
 | Email `DOUBT:` | Đã soạn, chưa gửi |
 | ER diagram và schema DB | Xong: `docs/ER_Diagram.md`, `database/` |
-| Thiết kế giao diện | Chưa làm (đang dùng layout tạm) |
-| Lập trình các module | Xong khung, Auth, Admin (employees, shops, cities), Billing, Payment. Các module còn lại chưa làm |
-| Kiểm thử | Có unit test và thử HTTP cho phần đã làm. Chưa kiểm thử toàn luồng |
+| Thiết kế giao diện | Web client React: banner, bảng giá, công cụ chiết khấu, tra cứu, phản hồi |
+| Backend .NET 10 | Xong: Domain, DbContext 25 bảng, Auth JWT, Order, Billing, Payment, Catalog, Customer, Admin, Portal |
+| Frontend nối API | Web client gọi API thật (bảng giá, cửa hàng, ưu đãi, tra cứu đơn/tài khoản) |
+| Web admin | Chưa làm giao diện; API quản trị đã sẵn |
+| Kiểm thử | 27 unit test backend pass; chưa chạy toàn luồng với SQL Server thật |
+| Docker / CI-CD | Có `docker-compose.yml`, Dockerfile API + web; chưa cấu hình pipeline Azure |
 | Status 1 / Status 2 | Chưa gửi |
 | Nộp cuối | Chưa |

@@ -965,6 +965,41 @@ body {
   gap: 8px;
 }
 
+/* Service tabs (Broadband / Dial-up / Landline) */
+.service-nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.service-tab-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.service-tab-btn:hover {
+  border-color: #38bdf8;
+  color: var(--primary);
+}
+
+.service-tab-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+}
+
 /* Bulk Discount Interactive Calculator */
 .bulk-calculator-card {
   background: linear-gradient(to right, #ffffff, #f0fdf4);
@@ -1150,6 +1185,12 @@ body {
 .mt-3 { margin-top: 1rem; }
 .mt-4 { margin-top: 1.5rem; }
 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+@keyframes nexusSpin {
+  to { transform: rotate(360deg); }
+}
+
+.spin { animation: nexusSpin 0.9s linear infinite; }
 
 @media (max-width: 1150px) {
   .nav-link-btn {

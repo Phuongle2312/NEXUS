@@ -1,72 +1,267 @@
-import React, { useState } from 'react';
-import { PLANS_DATA, getDiscountPercent, INITIAL_ORDERS, INITIAL_CONNECTIONS, INITIAL_BILLS, SHOPS } from '../data/mockData.js';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api } from '../api/apiClient.js';
 import HomeBanner from '../components/HomeBanner.jsx';
-import { Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send, Printer, MapPin, HelpCircle, ChevronDown } from 'lucide-react';
+import {
+  Zap, Check, AlertCircle, Building2, Gift, Clock, Search, Send,
+  Printer, Star, Loader2, RefreshCw, LogIn
+} from 'lucide-react';
+
+/* ==========================================================================
+   TRANG CÔNG KHAI - NEXUS
+   Dữ liệu lấy từ ASP.NET Core Web API (.NET 10):
+     GET /api/public/plans?type=D|B|T
+     GET /api/public/shops
+     GET /api/public/discount?qty=
+     GET /api/public/track-order?orderId=
+     GET /api/public/track-account?accountId=
+     POST /api/my/feedback            (yêu cầu đăng nhập khách hàng)
+   ========================================================================== */
+
+const TABS = [
+  { type: 'B', label: '🌐 Internet Băng Rộng (Broadband)' },
+  { type: 'D', label: '📞 Internet Dial-up' },
+  { type: 'T', label: '☎️ Điện Thoại Cố Định (Landline)' }
+];
+
+// Bậc ưu đãi dự phòng, dùng khi chưa gọi được API /public/discount.
+const FALLBACK_TIERS = [
+  { minQty: 1, maxQty: 9, discountPercent: 0 },
+  { minQty: 10, maxQty: 15, discountPercent: 25 },
+  { minQty: 16, maxQty: 25, discountPercent: 50 },
+  { minQty: 26, maxQty: 50, discountPercent: 75 },
+  { minQty: 51, maxQty: null, discountPercent: 100 }
+];
+
+const STATUS_META = {
+  SUBMITTED: { label: 'Đã tiếp nhận', cls: 'badge-info' },
+  FEASIBILITY_CHECK: { label: 'Đang khảo sát', cls: 'badge-warning' },
+  FEASIBLE: { label: 'Khảo sát đạt', cls: 'badge-success' },
+  NOT_FEASIBLE: { label: 'Không khả thi', cls: 'badge-danger' },
+  CONNECTED: { label: 'Đã cấp kết nối', cls: 'badge-success' },
+  CANCELLED: { label: 'Đã hủy', cls: 'badge-neutral' },
+  ACTIVE: { label: 'Đang hoạt động', cls: 'badge-success' },
+  TEMP_INACTIVE: { label: 'Tạm ngưng', cls: 'badge-warning' },
+  PERM_INACTIVE: { label: 'Ngừng hẳn', cls: 'badge-danger' }
+};
+
+const ORDER_STEPS = [
+  { status: 'SUBMITTED', label: 'Tiếp Nhận Đơn' },
+  { status: 'FEASIBILITY_CHECK', label: 'Khảo Sát Khả Thi' },
+  { status: 'FEASIBLE', label: 'Duyệt Khả Thi' },
+  { status: 'CONNECTED', label: 'Cấp Đấu Nối' }
+];
+
+const SERVICE_PREFIX = { D: 'Dial-up', B: 'Broadband', T: 'Điện thoại' };
+
+function statusMeta(status) {
+  return STATUS_META[status] || { label: status || '—', cls: 'badge-neutral' };
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function planTitle(plan) {
+  if (plan.connType === 'T') return `${plan.groupName} ${plan.planName}`.trim();
+  if (plan.hoursIncluded != null) return `${SERVICE_PREFIX[plan.connType] || ''} ${plan.planName}`.trim();
+  return `${plan.groupName} (${plan.planName})`;
+}
+
+function planQuota(plan) {
+  if (plan.hoursIncluded != null) return `${plan.hoursIncluded} giờ`;
+  if (plan.speedKbps != null) return `${plan.speedKbps} Kbps — không giới hạn`;
+  const rates = plan.callRates || [];
+  return rates.length
+    ? rates.map(r => `${r.callType} ${r.ratePerMin}$/phút`).join(' • ')
+    : 'Không giới hạn';
+}
+
+function planPeriod(plan) {
+  const months = plan.validityMonths;
+  if (months === 12) return '1 Năm';
+  if (months === 6) return '6 Tháng';
+  if (months === 1) return '1 Tháng';
+  return `${months} Tháng`;
+}
+
+/** Gói "phổ biến": gói không giới hạn 1 tháng nhanh nhất (D/B), Local Monthly (T). */
+function isFeatured(plan, all) {
+  if (plan.connType === 'T') return plan.groupName === 'Local' && plan.planName === 'Monthly';
+
+  const monthly = all.filter(p => p.connType === plan.connType
+    && p.hoursIncluded == null && p.validityMonths === 1);
+  if (!monthly.length) return false;
+  const top = monthly.reduce((best, p) => ((p.speedKbps ?? 0) > (best.speedKbps ?? 0) ? p : best));
+  return top.planId === plan.planId;
+}
+
+function localPercent(quantity, tiers) {
+  const list = tiers && tiers.length ? tiers : FALLBACK_TIERS;
+  const tier = list.find(t => quantity >= t.minQty && (t.maxQty == null || quantity <= t.maxQty));
+  return tier ? tier.discountPercent : 0;
+}
 
 export default function PublicView() {
-  const [activeTab, setActiveTab] = useState('BROADBAND');
+  const [activeType, setActiveType] = useState('B');
+
+  // ----------------------------- Danh mục -----------------------------
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+  const [shopCount, setShopCount] = useState(null);
+
+  // ----------------------------- Ưu đãi ------------------------------
   const [sliderQuantity, setSliderQuantity] = useState(12);
+  const [discount, setDiscount] = useState({ percent: localPercent(12), tiers: FALLBACK_TIERS });
+  const [discountLoading, setDiscountLoading] = useState(false);
 
-  // Search states
-  const [searchOrderId, setSearchOrderId] = useState('B0000000001');
+  // ---------------------------- Tra cứu ------------------------------
+  const [searchOrderId, setSearchOrderId] = useState('');
   const [orderResult, setOrderResult] = useState(null);
+  const [orderLoading, setOrderLoading] = useState(false);
 
-  const [searchAccountId, setSearchAccountId] = useState('B001000000000001');
+  const [searchAccountId, setSearchAccountId] = useState('');
   const [accountResult, setAccountResult] = useState(null);
+  const [accountLoading, setAccountLoading] = useState(false);
   const [selectedBillModal, setSelectedBillModal] = useState(null);
 
-  const [feedbackSuccess, setFeedbackSuccess] = useState(false);
-  const [openFaq, setOpenFaq] = useState(null);
+  // ---------------------------- Phản hồi -----------------------------
+  const [feedback, setFeedback] = useState({ refId: '', rating: '5', comment: '' });
+  const [feedbackState, setFeedbackState] = useState({ loading: false, error: '', success: '' });
 
-  const toggleFaq = (idx) => {
-    setOpenFaq(openFaq === idx ? null : idx);
-  };
+  const filteredPlans = useMemo(
+    () => plans.filter(p => p.connType === activeType),
+    [plans, activeType]
+  );
 
-  const faqs = [
-    {
-      q: 'Tại sao dịch vụ Internet Dial-up bắt buộc phải có đường dây điện thoại cố định Nexus?',
-      a: 'Theo quy chuẩn hạ tầng của Nexus, đường truyền Dial-up sử dụng băng tần thoại qua tổng đài Nexus nội hạt để truyền tải dữ liệu bảo mật cao. Do đó, khách hàng cần có sẵn đường truyền Landline của Nexus để kích hoạt kết nối Dial-up.'
-    },
-    {
-      q: 'Tiền đặt cọc bảo đảm (Security Deposit) là gì và khi nào được hoàn trả?',
-      a: 'Tiền đặt cọc là khoản bảo đảm thiết bị ($325 với Dial-up, $500 với Broadband, $250 với Landline). Khoản tiền này sẽ được hoàn lại 100% cho khách hàng khi thanh lý hợp đồng dịch vụ sau khi đã đối soát và khấu trừ hết nợ cước (nếu có).'
-    },
-    {
-      q: 'Chính sách chiết khấu số lượng lớn (Corporate Schemes) được tính như thế nào?',
-      a: 'Ưu đãi được áp dụng giảm trừ trực tiếp trên cả cước ứng trước và tiền cọc: 10–15 kết nối (giảm 25%), 16–25 kết nối (giảm 50%), 26–50 kết nối (giảm 75%) và trên 50 kết nối (giảm 100% - miễn phí cọc và cước trả trước).'
-    },
-    {
-      q: 'Làm thế nào để theo dõi tiến độ đơn hàng và xem hóa đơn cước hàng tháng?',
-      a: 'Bạn chỉ cần nhập mã Order ID (11 ký tự) tại khung tra cứu để xem tiến độ khảo sát và cấp mạng. Khi đã có kết nối, nhập mã Account ID (16 ký tự) để xem chi tiết tiền cước, nợ tồn và in biên lai hóa đơn trực tuyến.'
-    }
-  ];
+  const discountPct = discount?.percent ?? localPercent(sliderQuantity, discount?.tiers);
 
-  const filteredPlans = PLANS_DATA.filter(p => p.service === activeTab);
-  const discountPct = getDiscountPercent(sliderQuantity);
+  // Tải danh mục một lần khi mở trang.
+  useEffect(() => {
+    let cancelled = false;
 
-  const handleSearchOrder = () => {
-    const q = searchOrderId.trim().toUpperCase();
-    const found = INITIAL_ORDERS.find(o => o.orderId.toUpperCase() === q);
-    setOrderResult(found || { notFound: true, query: q });
-  };
+    const load = async () => {
+      const [plansRes, shopsRes] = await Promise.allSettled([api.getPlans(), api.getShops()]);
+      if (cancelled) return;
 
-  const handleSearchAccount = () => {
-    const q = searchAccountId.trim().toUpperCase();
-    const conn = INITIAL_CONNECTIONS.find(c => c.accountId.toUpperCase() === q);
-    if (!conn) {
-      setAccountResult({ notFound: true, query: q });
+      if (plansRes.status === 'fulfilled') {
+        setPlans(plansRes.value || []);
+        setCatalogError('');
+      } else {
+        setCatalogError(plansRes.reason?.message || 'Không tải được bảng giá từ máy chủ.');
+      }
+
+      if (shopsRes.status === 'fulfilled') {
+        setShopCount((shopsRes.value || []).length);
+      }
+
+      setPlansLoading(false);
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Tính ưu đãi theo số lượng, chờ người dùng ngừng kéo thanh trượt mới gọi API.
+  useEffect(() => {
+    let cancelled = false;
+    setDiscountLoading(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const data = await api.getDiscount(sliderQuantity);
+        if (!cancelled) setDiscount(data);
+      } catch {
+        if (!cancelled) setDiscount({ percent: localPercent(sliderQuantity), tiers: FALLBACK_TIERS });
+      } finally {
+        if (!cancelled) setDiscountLoading(false);
+      }
+    }, 250);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [sliderQuantity]);
+
+  const handleSearchOrder = async (event) => {
+    event?.preventDefault();
+    const query = searchOrderId.trim().toUpperCase();
+    if (!query) {
+      setOrderResult({ error: true, query: '', message: 'Vui lòng nhập Order ID cần tra cứu.' });
       return;
     }
-    const bill = INITIAL_BILLS.find(b => b.accountId.toUpperCase() === q);
-    setAccountResult({ conn, bill });
+
+    setOrderLoading(true);
+    setOrderResult(null);
+    try {
+      setOrderResult({ data: await api.trackOrder(query) });
+    } catch (err) {
+      setOrderResult({ error: true, query, message: err.message });
+    } finally {
+      setOrderLoading(false);
+    }
   };
 
-  const handleFeedbackSubmit = (e) => {
-    e.preventDefault();
-    setFeedbackSuccess(true);
-    setTimeout(() => setFeedbackSuccess(false), 5000);
-    e.target.reset();
+  const handleSearchAccount = async (event) => {
+    event?.preventDefault();
+    const query = searchAccountId.trim().toUpperCase();
+    if (!query) {
+      setAccountResult({ error: true, query: '', message: 'Vui lòng nhập Account ID cần tra cứu.' });
+      return;
+    }
+
+    setAccountLoading(true);
+    setAccountResult(null);
+    try {
+      setAccountResult({ data: await api.trackAccount(query) });
+    } catch (err) {
+      setAccountResult({ error: true, query, message: err.message });
+    } finally {
+      setAccountLoading(false);
+    }
   };
+
+  const handleFeedbackSubmit = async (event) => {
+    event.preventDefault();
+    const refId = feedback.refId.trim().toUpperCase();
+
+    if (!refId) {
+      setFeedbackState({ loading: false, success: '', error: 'Vui lòng nhập Account ID hoặc Order ID để gắn phản hồi.' });
+      return;
+    }
+
+    if (!feedback.comment.trim()) {
+      setFeedbackState({ loading: false, success: '', error: 'Vui lòng nhập nội dung phản hồi.' });
+      return;
+    }
+
+    setFeedbackState({ loading: true, success: '', error: '' });
+    try {
+      await api.sendFeedback({
+        refType: refId.length === 11 ? 'ORDER' : 'CONNECTION',
+        refId,
+        rating: Number(feedback.rating),
+        comment: feedback.comment.trim()
+      });
+      setFeedbackState({ loading: false, error: '', success: 'Cảm ơn quý khách! Phản hồi đã được chuyển tới Ban Chăm sóc Khách hàng Nexus.' });
+      setFeedback({ refId: '', rating: '5', comment: '' });
+    } catch (err) {
+      const needsLogin = err.status === 401 || err.status === 403 || err.code === 'AUTH_INVALID';
+      setFeedbackState({
+        loading: false,
+        success: '',
+        error: needsLogin
+          ? 'Gửi phản hồi yêu cầu đăng nhập cổng khách hàng. Vui lòng đăng nhập hoặc gọi hotline 1900 8888.'
+          : err.message
+      });
+    }
+  };
+
+  const discountPolicy = discountPct === 0
+    ? 'Không giảm (< 10 kết nối)'
+    : `Giảm ${discountPct}% cho hợp đồng từ ${sliderQuantity} kết nối`;
 
   return (
     <div>
@@ -85,7 +280,7 @@ export default function PublicView() {
         <div className="stat-card">
           <div className="stat-icon green"><Building2 size={24} /></div>
           <div className="stat-info">
-            <div className="stat-value">64+</div>
+            <div className="stat-value">{shopCount == null ? '—' : `${shopCount}+`}</div>
             <div className="stat-label">Cửa hàng bán lẻ toàn quốc</div>
           </div>
         </div>
@@ -117,65 +312,79 @@ export default function PublicView() {
 
           {/* Service Tabs */}
           <div className="service-nav-tabs">
-            <button
-              className={`service-tab-btn ${activeTab === 'BROADBAND' ? 'active' : ''}`}
-              onClick={() => setActiveTab('BROADBAND')}
-            >
-              🌐 Internet Băng Rộng (Broadband)
-            </button>
-            <button
-              className={`service-tab-btn ${activeTab === 'DIALUP' ? 'active' : ''}`}
-              onClick={() => setActiveTab('DIALUP')}
-            >
-              📞 Internet Dial-up
-            </button>
-            <button
-              className={`service-tab-btn ${activeTab === 'LANDLINE' ? 'active' : ''}`}
-              onClick={() => setActiveTab('LANDLINE')}
-            >
-              ☎️ Điện Thoại Cố Định (Landline)
-            </button>
+            {TABS.map(tab => (
+              <button
+                key={tab.type}
+                className={`service-tab-btn ${activeType === tab.type ? 'active' : ''}`}
+                onClick={() => setActiveType(tab.type)}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
+
+          {catalogError && (
+            <div style={{ padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: 'var(--radius)', marginBottom: '1rem', fontWeight: 600 }}>
+              <AlertCircle size={16} /> {catalogError}
+            </div>
+          )}
 
           {/* Plan Cards Grid */}
           <div className="pricing-grid">
-            {filteredPlans.map(plan => (
-              <div key={plan.id} className={`pricing-card ${plan.featured ? 'featured' : ''}`}>
-                {plan.featured && <span className="pricing-badge">Phổ Biến Nhất</span>}
-                <div className="pricing-card-header">
-                  <div className="pricing-service-type">{plan.service} • {plan.speed}</div>
-                  <h3 className="pricing-plan-name">{plan.name}</h3>
-                </div>
-                <div className="pricing-price-wrap">
-                  <span className="pricing-currency">$</span>
-                  <span className="pricing-price">{plan.price}</span>
-                  <span className="pricing-period">/ {plan.validity}</span>
-                </div>
-                <ul className="pricing-features">
-                  <li>
-                    <Check size={16} color="var(--success)" />
-                    Hạn mức / Tốc độ: <strong>{plan.quota}</strong>
-                  </li>
-                  <li>
-                    <Check size={16} color="var(--success)" />
-                    Tiền đặt cọc thiết bị: <strong>${plan.deposit}</strong> (Hoàn lại)
-                  </li>
-                  <li>
-                    <Check size={16} color="var(--success)" />
-                    Thời hạn hiệu lực: <strong>{plan.validity}</strong>
-                  </li>
-                  {plan.service === 'DIALUP' && (
-                    <li style={{ color: '#ea580c' }}>
-                      <AlertCircle size={16} color="#ea580c" />
-                      Yêu cầu có sẵn Landline của Nexus
-                    </li>
-                  )}
-                </ul>
-                <a href="#schemes-section" className={`btn ${plan.featured ? 'btn-primary' : 'btn-outline'}`} style={{ textDecoration: 'none' }}>
-                  Tính Chiết Khấu Khi Đăng Ký
-                </a>
+            {plansLoading && (
+              <div className="text-muted" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '1rem' }}>
+                <Loader2 size={16} className="spin" /> Đang tải bảng giá từ máy chủ...
               </div>
-            ))}
+            )}
+
+            {!plansLoading && !catalogError && filteredPlans.length === 0 && (
+              <div className="text-muted" style={{ padding: '1rem' }}>
+                Chưa có gói cước nào đang áp dụng cho loại dịch vụ này.
+              </div>
+            )}
+
+            {filteredPlans.map(plan => {
+              const featured = isFeatured(plan, filteredPlans);
+              return (
+                <div key={plan.planId} className={`pricing-card ${featured ? 'featured' : ''}`}>
+                  {featured && <span className="pricing-badge">Phổ Biến Nhất</span>}
+                  <div className="pricing-card-header">
+                    <div className="pricing-service-type">
+                      {SERVICE_PREFIX[plan.connType]} • {plan.speedKbps ? `${plan.speedKbps} Kbps` : 'Thoại cố định'}
+                    </div>
+                    <h3 className="pricing-plan-name">{planTitle(plan)}</h3>
+                  </div>
+                  <div className="pricing-price-wrap">
+                    <span className="pricing-currency">$</span>
+                    <span className="pricing-price">{plan.price}</span>
+                    <span className="pricing-period">/ {planPeriod(plan)}</span>
+                  </div>
+                  <ul className="pricing-features">
+                    <li>
+                      <Check size={16} color="var(--success)" />
+                      Hạn mức / Tốc độ: <strong>{planQuota(plan)}</strong>
+                    </li>
+                    <li>
+                      <Check size={16} color="var(--success)" />
+                      Tiền đặt cọc thiết bị: <strong>${plan.deposit}</strong> (Hoàn lại)
+                    </li>
+                    <li>
+                      <Check size={16} color="var(--success)" />
+                      Thời hạn hiệu lực: <strong>{planPeriod(plan)}</strong>
+                    </li>
+                    {plan.connType === 'D' && (
+                      <li style={{ color: '#ea580c' }}>
+                        <AlertCircle size={16} color="#ea580c" />
+                        Yêu cầu có sẵn Landline của Nexus
+                      </li>
+                    )}
+                  </ul>
+                  <a href="#schemes-section" className={`btn ${featured ? 'btn-primary' : 'btn-outline'}`} style={{ textDecoration: 'none' }}>
+                    Tính Chiết Khấu Khi Đăng Ký
+                  </a>
+                </div>
+              );
+            })}
           </div>
 
           {/* Bulk Discount Interactive Calculator */}
@@ -189,7 +398,8 @@ export default function PublicView() {
                   Ưu đãi áp dụng khi khách hàng hoặc doanh nghiệp đăng ký từ 10 đường truyền trở lên
                 </p>
               </div>
-              <div className="discount-tier-badge">
+              <div className="discount-tier-badge" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {discountLoading && <RefreshCw size={14} className="spin" />}
                 -{discountPct}% GIẢM GIÁ
               </div>
             </div>
@@ -200,7 +410,7 @@ export default function PublicView() {
                   Số lượng kết nối dự kiến đăng ký:{' '}
                   <strong style={{ color: 'var(--primary)', fontSize: '1.1rem' }}>{sliderQuantity}</strong> kết nối
                 </span>
-                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Kéo thanh trượt từ 1 đến 60+ kết nối</span>
+                <span className="text-muted" style={{ fontSize: '0.85rem' }}>Kéo thanh trượt từ 1 đến 60 kết nối</span>
               </div>
               <input
                 type="range"
@@ -216,15 +426,7 @@ export default function PublicView() {
               <div style={{ background: 'white', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid #bbf7d0' }}>
                 <span className="text-muted">Chính sách áp dụng:</span>
                 <div style={{ fontWeight: 700, color: '#166534', marginTop: '2px' }}>
-                  {sliderQuantity < 10
-                    ? 'Không giảm (< 10 kết nối)'
-                    : sliderQuantity <= 15
-                    ? 'Bậc 10–15: Giảm 25%'
-                    : sliderQuantity <= 25
-                    ? 'Bậc 16–25: Giảm 50%'
-                    : sliderQuantity <= 50
-                    ? 'Bậc 26–50: Giảm 75%'
-                    : 'Bậc > 50: Giảm 100%'}
+                  {discountPolicy}
                 </div>
               </div>
               <div style={{ background: 'white', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid #bbf7d0' }}>
@@ -253,7 +455,7 @@ export default function PublicView() {
               <h3 className="nexus-card-title">📦 Tra Cứu Tiến Độ Đơn (Order ID)</h3>
             </div>
             <p className="form-hint">Nhập mã đơn hàng 11 ký tự bạn nhận được tại cửa hàng (VD: <code>B0000000001</code>)</p>
-            <div className="flex-gap-2" style={{ marginTop: '1rem' }}>
+            <form className="flex-gap-2" style={{ marginTop: '1rem' }} onSubmit={handleSearchOrder}>
               <input
                 type="text"
                 className="form-control"
@@ -261,53 +463,58 @@ export default function PublicView() {
                 onChange={(e) => setSearchOrderId(e.target.value)}
                 placeholder="Nhập Order ID..."
               />
-              <button className="btn btn-primary" onClick={handleSearchOrder}>
-                <Search size={16} /> Tra Cứu
+              <button type="submit" className="btn btn-primary" disabled={orderLoading}>
+                {orderLoading ? <Loader2 size={16} className="spin" /> : <Search size={16} />} Tra Cứu
               </button>
-            </div>
+            </form>
 
             <div className="tracking-result-box" style={{ marginTop: '1.25rem', padding: '1.25rem', background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: 'var(--radius)' }}>
-              {orderResult && orderResult.notFound ? (
-                <div style={{ color: 'var(--danger)', fontWeight: 600 }}>
-                  ❌ Không tìm thấy đơn hàng mã {orderResult.query}
-                </div>
-              ) : orderResult ? (
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '8px' }}>
-                    {orderResult.customerName}{' '}
-                    <span className={`badge ${orderResult.status === 'CONNECTED' ? 'badge-success' : 'badge-warning'}`}>
-                      {orderResult.status}
-                    </span>
-                  </div>
-                  <div className="nexus-stepper">
-                    <div className="step-item completed">
-                      <div className="step-circle">✓</div>
-                      <div className="step-label">Tiếp Nhận Đơn</div>
-                    </div>
-                    <div className={`step-item ${orderResult.status === 'FEASIBLE' || orderResult.status === 'CONNECTED' ? 'completed' : 'active'}`}>
-                      <div className="step-circle">
-                        {orderResult.status === 'FEASIBLE' || orderResult.status === 'CONNECTED' ? '✓' : '2'}
-                      </div>
-                      <div className="step-label">Khảo Sát Khả Thi</div>
-                    </div>
-                    <div className={`step-item ${orderResult.status === 'CONNECTED' ? 'completed' : ''}`}>
-                      <div className="step-circle">
-                        {orderResult.status === 'CONNECTED' ? '✓' : '3'}
-                      </div>
-                      <div className="step-label">Cấp Đấu Nối</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.6 }}>
-                    • Gói đăng ký: <strong>{orderResult.planName}</strong> ({orderResult.quantity} đường)<br />
-                    • Đặt cọc: <strong>${orderResult.totalDeposit.toLocaleString()}</strong> | Cước ứng trước: <strong>${orderResult.totalAdvance.toLocaleString()}</strong> (Đã giảm {orderResult.discountPercent}%)<br />
-                    • Điểm tiếp nhận: <strong>{orderResult.shop}</strong> ({orderResult.createdAt})
-                  </div>
-                </div>
-              ) : (
+              {!orderResult && (
                 <div className="text-muted" style={{ fontSize: '0.875rem' }}>
                   Nhấn "Tra Cứu" để theo dõi quy trình khảo sát đường truyền và thời gian lắp đặt.
                 </div>
               )}
+
+              {orderResult?.error && (
+                <div style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                  ❌ {orderResult.message}
+                </div>
+              )}
+
+              {orderResult?.data && (() => {
+                const order = orderResult.data;
+                const meta = statusMeta(order.status);
+                const currentIndex = ORDER_STEPS.findIndex(s => s.status === order.status);
+                const failed = order.status === 'NOT_FEASIBLE' || order.status === 'CANCELLED';
+
+                return (
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <code className="font-mono" style={{ color: 'var(--primary)' }}>{order.orderId}</code>
+                      <span className={`badge ${meta.cls}`}>{meta.label}</span>
+                    </div>
+
+                    <div className="nexus-stepper">
+                      {ORDER_STEPS.map((step, index) => {
+                        const done = !failed && currentIndex >= 0 && index <= currentIndex;
+                        const active = !failed && index === currentIndex + 1;
+                        return (
+                          <div key={step.status} className={`step-item ${done ? 'completed' : ''} ${active ? 'active' : ''}`}>
+                            <div className="step-circle">{done ? '✓' : index + 1}</div>
+                            <div className="step-label">{step.label}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.6 }}>
+                      • Gói đăng ký: <strong>{order.planName}</strong> ({order.quantity} đường)<br />
+                      • Đã cấp kết nối: <strong>{order.connectedQty}/{order.quantity}</strong> đường<br />
+                      • Ưu đãi áp dụng: <strong>{order.discountPercent}%</strong> | Ngày đặt: <strong>{formatDate(order.orderDate)}</strong>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -317,7 +524,7 @@ export default function PublicView() {
               <h3 className="nexus-card-title">📡 Tra Cứu Cước & Thuê Bao (Account ID)</h3>
             </div>
             <p className="form-hint">Nhập mã tài khoản 16 ký tự do Kỹ thuật cấp (VD: <code>B001000000000001</code>)</p>
-            <div className="flex-gap-2" style={{ marginTop: '1rem' }}>
+            <form className="flex-gap-2" style={{ marginTop: '1rem' }} onSubmit={handleSearchAccount}>
               <input
                 type="text"
                 className="form-control"
@@ -325,55 +532,63 @@ export default function PublicView() {
                 onChange={(e) => setSearchAccountId(e.target.value)}
                 placeholder="Nhập Account ID..."
               />
-              <button className="btn btn-primary" onClick={handleSearchAccount}>
-                <Search size={16} /> Tra Cứu
+              <button type="submit" className="btn btn-primary" disabled={accountLoading}>
+                {accountLoading ? <Loader2 size={16} className="spin" /> : <Search size={16} />} Tra Cứu
               </button>
-            </div>
+            </form>
 
             <div className="tracking-result-box" style={{ marginTop: '1.25rem', padding: '1.25rem', background: '#f8fafc', border: '1px solid var(--border-color)', borderRadius: 'var(--radius)' }}>
-              {accountResult && accountResult.notFound ? (
-                <div style={{ color: 'var(--danger)', fontWeight: 600 }}>
-                  ❌ Không tìm thấy tài khoản kết nối mã {accountResult.query}
+              {!accountResult && (
+                <div className="text-muted" style={{ fontSize: '0.875rem' }}>
+                  Nhập mã Account ID để xem trạng thái thuê bao và số nợ cước hiện tại.
                 </div>
-              ) : accountResult ? (
-                <div>
-                  <div className="flex-between">
-                    <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
-                      Account ID: <code className="font-mono" style={{ color: 'var(--primary)' }}>{accountResult.conn.accountId}</code>
-                    </div>
-                    <span className={`badge ${accountResult.conn.status === 'ACTIVE' ? 'badge-success' : 'badge-danger'}`}>
-                      {accountResult.conn.status}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '10px', lineHeight: 1.6 }}>
-                    • Chủ thuê bao: <strong>{accountResult.conn.customerName}</strong><br />
-                    • Gói cước: <strong>{accountResult.conn.planName}</strong> ({accountResult.conn.service})<br />
-                    • Thiết bị modem/router: <code>{accountResult.conn.equipmentSerial}</code><br />
-                    • Địa chỉ: <strong>{accountResult.conn.installationAddress}</strong>
-                  </div>
+              )}
 
-                  {accountResult.bill && (
-                    <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              {accountResult?.error && (
+                <div style={{ color: 'var(--danger)', fontWeight: 600 }}>
+                  ❌ {accountResult.message}
+                </div>
+              )}
+
+              {accountResult?.data && (() => {
+                const conn = accountResult.data;
+                const meta = statusMeta(conn.status);
+
+                return (
+                  <div>
+                    <div className="flex-between">
+                      <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>
+                        Account ID: <code className="font-mono" style={{ color: 'var(--primary)' }}>{conn.accountId}</code>
+                      </div>
+                      <span className={`badge ${meta.cls}`}>{meta.label}</span>
+                    </div>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: '10px', lineHeight: 1.6 }}>
+                      • Gói cước: <strong>{conn.planName}</strong> ({SERVICE_PREFIX[conn.connType]})<br />
+                      • Khu vực: <strong>{conn.cityName}</strong><br />
+                      • Ngày kích hoạt: <strong>{formatDate(conn.activationDate)}</strong>
+                    </div>
+
+                    <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <div>
-                        <span className="text-muted" style={{ fontSize: '0.8rem' }}>Cước kỳ gần nhất:</span>
-                        <div style={{ fontWeight: 800, color: 'var(--text-primary)', fontSize: '1.1rem' }}>
-                          ${accountResult.bill.totalThisCycle.toFixed(2)}{' '}
-                          <span className={`badge ${accountResult.bill.status === 'PAID' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.7rem' }}>
-                            {accountResult.bill.status}
+                        <span className="text-muted" style={{ fontSize: '0.8rem' }}>Tổng nợ cước hiện tại:</span>
+                        <div style={{ fontWeight: 800, fontSize: '1.1rem', color: conn.dueAmount > 0 ? 'var(--danger)' : 'var(--success)' }}>
+                          ${Number(conn.dueAmount || 0).toFixed(2)}{' '}
+                          <span className={`badge ${conn.dueAmount > 0 ? 'badge-danger' : 'badge-success'}`} style={{ fontSize: '0.7rem' }}>
+                            {conn.dueAmount > 0 ? 'CÒN NỢ' : 'ĐÃ TẤT TOÁN'}
                           </span>
                         </div>
                       </div>
-                      <button className="btn btn-outline btn-sm" onClick={() => setSelectedBillModal(accountResult.bill)}>
-                        <Printer size={14} /> Xem Hóa Đơn Chi Tiết
+                      <button className="btn btn-outline btn-sm" onClick={() => setSelectedBillModal(conn)}>
+                        <Printer size={14} /> Xem Chi Tiết Công Nợ
                       </button>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-muted" style={{ fontSize: '0.875rem' }}>
-                  Nhập mã Account ID để xem cước phát sinh, số tiền nợ và tải hóa đơn trực tiếp.
-                </div>
-              )}
+
+                    <p className="form-hint" style={{ marginTop: '10px' }}>
+                      Chi tiết từng hóa đơn và thanh toán chỉ hiển thị sau khi đăng nhập cổng khách hàng.
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -385,32 +600,69 @@ export default function PublicView() {
           <div className="nexus-card-header">
             <h3 className="nexus-card-title">💬 Gửi Ý Kiến Đóng Góp & Phản Hồi Dịch Vụ</h3>
           </div>
-          {feedbackSuccess && (
-            <div style={{ padding: '12px', background: 'var(--success-bg)', color: 'var(--success)', borderRadius: 'var(--radius)', marginBottom: '1rem', fontWeight: 600 }}>
-              ✓ Cảm ơn quý khách! Ý kiến phản hồi đã được chuyển tới Ban Chăm sóc Khách hàng Nexus.
+
+          {feedbackState.success && (
+            <div style={{ padding: '12px', background: 'var(--success-bg)', color: 'var(--success)', borderRadius: 'var(--radius)', marginBottom: '1rem', fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Check size={16} /> {feedbackState.success}
             </div>
           )}
+
+          {feedbackState.error && (
+            <div style={{ padding: '12px', background: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: 'var(--radius)', marginBottom: '1rem', fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <LogIn size={16} style={{ flexShrink: 0, marginTop: '2px' }} /> <span>{feedbackState.error}</span>
+            </div>
+          )}
+
+          <p className="form-hint" style={{ marginBottom: '1rem' }}>
+            Phản hồi được gắn với đúng thuê bao của bạn. Vui lòng đăng nhập cổng khách hàng trước khi gửi,
+            hoặc nhập mã Order ID / Account ID đang sở hữu.
+          </p>
+
           <form onSubmit={handleFeedbackSubmit}>
             <div className="grid-3">
               <div className="form-group">
-                <label className="form-label">Họ và tên <span className="req">*</span></label>
-                <input type="text" className="form-control" placeholder="Nguyễn Văn A" required />
+                <label className="form-label">Mã Account ID / Order ID <span className="req">*</span></label>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="B001000000000001"
+                  value={feedback.refId}
+                  onChange={(e) => setFeedback(f => ({ ...f, refId: e.target.value }))}
+                  required
+                />
               </div>
               <div className="form-group">
-                <label className="form-label">Số điện thoại liên hệ <span className="req">*</span></label>
-                <input type="tel" className="form-control" placeholder="0987654321" required />
+                <label className="form-label">Điểm đánh giá chất lượng</label>
+                <select
+                  className="form-select"
+                  value={feedback.rating}
+                  onChange={(e) => setFeedback(f => ({ ...f, rating: e.target.value }))}
+                >
+                  {[5, 4, 3, 2, 1].map(score => (
+                    <option key={score} value={score}>{score} sao</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Mã Account ID / Order ID (nếu có)</label>
-                <input type="text" className="form-control" placeholder="B001000000000001" />
+                <label className="form-label">Kênh hỗ trợ trực tiếp</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingTop: '0.55rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  <Star size={16} /> Hotline 1900 8888
+                </div>
               </div>
             </div>
             <div className="form-group">
               <label className="form-label">Nội dung phản hồi hoặc khiếu nại <span className="req">*</span></label>
-              <textarea className="form-control" rows="3" placeholder="Nhập thông tin phản hồi của bạn về chất lượng dịch vụ, tốc độ đường truyền hoặc nhân viên hỗ trợ..." required></textarea>
+              <textarea
+                className="form-control"
+                rows="3"
+                placeholder="Nhập thông tin phản hồi của bạn về chất lượng dịch vụ, tốc độ đường truyền hoặc nhân viên hỗ trợ..."
+                value={feedback.comment}
+                onChange={(e) => setFeedback(f => ({ ...f, comment: e.target.value }))}
+                required
+              ></textarea>
             </div>
-            <button type="submit" className="btn btn-primary">
-              <Send size={16} /> Gửi Phản Hồi Cho Nexus
+            <button type="submit" className="btn btn-primary" disabled={feedbackState.loading}>
+              {feedbackState.loading ? <Loader2 size={16} className="spin" /> : <Send size={16} />} Gửi Phản Hồi Cho Nexus
             </button>
           </form>
         </div>
@@ -421,7 +673,7 @@ export default function PublicView() {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>📄 Hóa Đơn Dịch Vụ Viễn Thông</h3>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>📄 Bảng Tổng Hợp Công Nợ</h3>
               <button className="btn btn-outline btn-sm" onClick={() => setSelectedBillModal(null)}>✕</button>
             </div>
             <div className="modal-body">
@@ -429,46 +681,37 @@ export default function PublicView() {
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem', borderBottom: '1px dashed #cbd5e1', paddingBottom: '1rem' }}>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)' }}>NEXUS COMMUNICATION SYSTEM</h2>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>DỊCH VỤ VIỄN THÔNG & INTERNET</div>
-                  <div style={{ marginTop: '8px', fontWeight: 700 }}>HÓA ĐƠN SỐ: {selectedBillModal.billId}</div>
-                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>Ngày phát hành: {selectedBillModal.issuedDate}</div>
+                  <div style={{ marginTop: '8px', fontWeight: 700 }}>SAO KÊ THUÊ BAO</div>
+                  <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>Tra cứu công khai — chi tiết hóa đơn cần đăng nhập</div>
                 </div>
 
-                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
-                  <span className="text-muted">Chủ thuê bao:</span>
-                  <strong>{selectedBillModal.customerName}</strong>
-                </div>
                 <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
                   <span className="text-muted">Account ID:</span>
                   <code className="font-mono">{selectedBillModal.accountId}</code>
                 </div>
                 <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
-                  <span className="text-muted">Kỳ thanh toán:</span>
-                  <span>{selectedBillModal.billingCycle}</span>
+                  <span className="text-muted">Gói cước:</span>
+                  <strong>{selectedBillModal.planName}</strong>
+                </div>
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span className="text-muted">Khu vực:</span>
+                  <span>{selectedBillModal.cityName}</span>
+                </div>
+                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
+                  <span className="text-muted">Ngày kích hoạt:</span>
+                  <span>{formatDate(selectedBillModal.activationDate)}</span>
                 </div>
                 <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '10px 0' }} />
 
-                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
-                  <span>Cước gói thuê bao:</span>
-                  <span>${selectedBillModal.planFee.toFixed(2)}</span>
-                </div>
-                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem' }}>
-                  <span>Cước phát sinh / cuộc gọi:</span>
-                  <span>${selectedBillModal.usageOverdue.toFixed(2)}</span>
-                </div>
-                <div className="flex-between" style={{ marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  <span>Thuế dịch vụ viễn thông (12.24%):</span>
-                  <span>${selectedBillModal.taxAmount.toFixed(2)}</span>
-                </div>
-
                 <div className="flex-between" style={{ borderTop: '2px solid var(--text-primary)', marginTop: '1rem', paddingTop: '0.75rem', fontWeight: 800, fontSize: '1.1rem' }}>
-                  <span>TỔNG HÓA ĐƠN:</span>
-                  <span style={{ color: 'var(--primary)' }}>${selectedBillModal.totalThisCycle.toFixed(2)}</span>
+                  <span>TỔNG CÔNG NỢ:</span>
+                  <span style={{ color: 'var(--primary)' }}>${Number(selectedBillModal.dueAmount || 0).toFixed(2)}</span>
                 </div>
 
                 <div className="flex-between" style={{ marginTop: '8px', fontSize: '0.9rem' }}>
-                  <span className="text-muted">Tình trạng thanh toán:</span>
-                  <span className={`badge ${selectedBillModal.status === 'PAID' ? 'badge-success' : 'badge-danger'}`}>
-                    {selectedBillModal.status}
+                  <span className="text-muted">Tình trạng thuê bao:</span>
+                  <span className={`badge ${statusMeta(selectedBillModal.status).cls}`}>
+                    {statusMeta(selectedBillModal.status).label}
                   </span>
                 </div>
               </div>
@@ -476,7 +719,7 @@ export default function PublicView() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSelectedBillModal(null)}>Đóng</button>
               <button className="btn btn-primary" onClick={() => window.print()}>
-                <Printer size={16} /> In Hóa Đơn
+                <Printer size={16} /> In Sao Kê
               </button>
             </div>
           </div>

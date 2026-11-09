@@ -6,9 +6,9 @@
 
 Nexus Service Marketing System là ứng dụng web thay thế quy trình giấy tờ của Nexus Communication System, nhà cung cấp dịch vụ điện thoại bàn, Dial-up và Broadband qua mạng lưới cửa hàng bán lẻ. Hệ thống quản lý đơn đăng ký, kiểm tra khả thi, cấp kết nối, thiết bị và kho, gói cước, hóa đơn và thanh toán trả sau, với đăng nhập riêng cho Admin, nhân viên cửa hàng, kỹ thuật, kế toán và khách hàng.
 
-**Công nghệ:** Java 17, JSP/Servlets (Jakarta EE), JDBC, SQL Server 2019 trở lên, Tomcat 10.1.
+**Công nghệ:** .NET 10 (ASP.NET Core Web API, EF Core 10), React 19 + Vite 6, SQL Server 2019 trở lên, JWT Bearer, BCrypt.
 
-**Kiến trúc:** phân tầng Servlet → Service → DAO → CSDL. Service phụ thuộc vào interface DAO và được lắp ráp tại một nơi duy nhất, nên nghiệp vụ test được không cần CSDL.
+**Kiến trúc:** monolith một tiến trình API theo tầng Controller → Service → EF Core → CSDL, không API gateway và không microservice. Controller chỉ kiểm tra quyền và ánh xạ DTO; nghiệp vụ nằm trong Service nên test được không cần CSDL. Web client và web admin là SPA React gọi API qua JWT.
 
 ## Problem Definition
 

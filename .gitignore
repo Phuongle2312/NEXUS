@@ -23,3 +23,13 @@ database/backup/*.bak
 
 # Local config, never commit real credentials
 *.local.properties
+
+# .NET / backend
+backend/**/bin/
+backend/**/obj/
+*.user
+*.suo
+
+# Frontend env overrides
+frontend/.env
+frontend/.env.local
